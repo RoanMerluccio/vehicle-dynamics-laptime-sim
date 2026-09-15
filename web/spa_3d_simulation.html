@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Circuit de Spa-Francorchamps — Lap Telemetry & Simulation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-dark: #090b10;
+      --panel-bg: rgba(14, 18, 26, 0.88);
+      --panel-border: rgba(255, 255, 255, 0.08);
+      --panel-border-strong: rgba(255, 255, 255, 0.16);
+      --accent-blue: #38bdf8;
+      --accent-red: #ef4444;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-subtle: #64748b;
+      --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg-dark);
+      font-family: var(--font-ui);
+      color: var(--text-main);
+    }
+
+    #webgl-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* Top Navigation / Info Bar */
+    .top-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 48px;
+      z-index: 10;
+      background: rgba(10, 13, 18, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--panel-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 18px;
+    }
+
+    .circuit-badge {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .circuit-title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      color: var(--text-main);
+    }
+
+    .circuit-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .landmark-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--panel-border);
+      padding: 4px 12px;
+      border-radius: 6px;
+    }
+
+    .landmark-text-active {
+      color: var(--accent-blue);
+      font-weight: 500;
+    }
+
+    .top-stats {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .stat-pill {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .stat-pill-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-subtle);
+    }
+
+    .stat-pill-val {
+      font-size: 12px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--text-main);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Telemetry HUD (Right Docked Panel) */
+    .telemetry-hud {
+      position: absolute;
+      top: 58px;
+      right: 16px;
+      width: 290px;
+      z-index: 10;
+      background: var(--panel-bg);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 14px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .panel-section-title {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-subtle);
+      margin-bottom: -4px;
+    }
+
+    /* Shift Lights */
+    .shift-lights-container {
+      display: flex;
+      justify-content: space-between;
+      gap: 3px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 5px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--panel-border);
+    }
+
+    .shift-led {
+      flex: 1;
+      height: 6px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.08);
+      transition: background 0.04s ease;
+    }
+
+    .shift-led.green.active { background: var(--accent-green); }
+    .shift-led.amber.active { background: var(--accent-amber); }
+    .shift-led.red.active   { background: var(--accent-red); }
+    .shift-led.blue.active  { background: #60a5fa; }
+
+    /* Speed & Gear Block */
+    .speedo-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      padding: 8px 12px;
+    }
+
+    .gear-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border-right: 1px solid var(--panel-border);
+      padding-right: 12px;
+      min-width: 48px;
+    }
+
+    .gear-label {
+      font-size: 9px;
+      color: var(--text-subtle);
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    .gear-val {
+      font-size: 28px;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--text-main);
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .speed-display {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .speed-num {
+      font-size: 36px;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--text-main);
+      line-height: 1;
+      letter-spacing: -0.5px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .speed-unit {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      margin-top: 3px;
+    }
+
+    /* RPM Gauge Bar */
+    .rpm-container {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .rpm-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--text-subtle);
+    }
+
+    .rpm-bar-bg {
+      width: 100%;
+      height: 6px;
+      background: rgba(0,0,0,0.4);
+      border-radius: 3px;
+      overflow: hidden;
+      border: 1px solid var(--panel-border);
+    }
+
+    .rpm-bar-fill {
+      height: 100%;
+      width: 30%;
+      background: var(--text-muted);
+      border-radius: 3px;
+      transition: width 0.04s ease;
+    }
+
+    /* Sector Splits & Time */
+    .time-card {
+      background: rgba(0,0,0,0.25);
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--panel-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .time-clock-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-subtle);
+      letter-spacing: 0.5px;
+    }
+
+    .time-clock-val {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-main);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .sectors-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+    }
+
+    .sec-card {
+      background: rgba(0,0,0,0.25);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      padding: 5px 6px;
+      text-align: center;
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .sec-card.current {
+      border-color: var(--accent-blue);
+      background: rgba(56, 189, 248, 0.08);
+    }
+
+    .sec-name {
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--text-subtle);
+    }
+
+    .sec-time {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-top: 1px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* G-G Diagram & Pedals Row */
+    .dynamics-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .gg-box {
+      width: 100px;
+      height: 100px;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .gg-canvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    .pedals-box {
+      flex: 1;
+      display: flex;
+      gap: 8px;
+      height: 100px;
+    }
+
+    .pedal-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .pedal-track {
+      flex: 1;
+      width: 100%;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--panel-border);
+      border-radius: 4px;
+      position: relative;
+      display: flex;
+      flex-direction: column-reverse;
+      overflow: hidden;
+    }
+
+    .pedal-bar-fill {
+      width: 100%;
+      height: 0%;
+      border-radius: 2px;
+      transition: height 0.04s ease;
+    }
+
+    .pedal-bar-fill.throttle {
+      background: var(--accent-green);
+    }
+
+    .pedal-bar-fill.brake {
+      background: var(--accent-red);
+    }
+
+    .pedal-label {
+      font-size: 9px;
+      font-family: var(--font-mono);
+      color: var(--text-subtle);
+      font-weight: 600;
+    }
+
+    /* Track Minimap */
+    .minimap-wrapper {
+      width: 100%;
+      height: 110px;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #minimap-canvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Bottom Control Bar */
+    .bottom-bar {
+      position: absolute;
+      bottom: 14px;
+      left: 16px;
+      right: 16px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .timeline-container {
+      background: var(--panel-bg);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      pointer-events: auto;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+
+    .timeline-slider {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255,255,255,0.12);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .timeline-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #fff;
+      cursor: pointer;
+      border: 1px solid rgba(0,0,0,0.2);
+    }
+
+    .timeline-time {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      min-width: 95px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .controls-deck {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 4px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 4px;
+      pointer-events: auto;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+
+    .btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.1s ease;
+      font-family: var(--font-ui);
+    }
+
+    .btn:hover {
+      background: rgba(255,255,255,0.06);
+      color: var(--text-main);
+    }
+
+    .btn.active {
+      background: rgba(255,255,255,0.12);
+      color: var(--text-main);
+      border-color: var(--panel-border-strong);
+    }
+
+    .btn-play {
+      font-weight: 600;
+      color: var(--text-main);
+      background: rgba(255,255,255,0.08);
+      border: 1px solid var(--panel-border);
+      padding: 6px 14px;
+    }
+
+    .btn-play:hover {
+      background: rgba(255,255,255,0.15);
+    }
+
+    @media (max-width: 900px) {
+      .telemetry-hud {
+        display: none;
+      }
+      .landmark-label {
+        display: none;
+      }
+    }
+  </style>
+
+  <!-- Three.js & OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <!-- Load simulation data -->
+  <script src="spa_sim_data.js"></script>
+</head>
+<body>
+
+  <!-- WebGL 3D Canvas Container -->
+  <div id="webgl-container"></div>
+
+  <!-- Top Navigation & Session Bar -->
+  <div class="top-bar">
+    <div class="circuit-badge">
+      <div class="circuit-title">Circuit de Spa-Francorchamps</div>
+      <div class="circuit-meta">7,004 m &bull; 102.2 m Elevation &bull; 19 Turns</div>
+    </div>
+
+    <!-- Landmark Callout -->
+    <div class="landmark-label" id="landmark-badge">
+      Track Section: <span class="landmark-text-active" id="landmark-text">La Source Hairpin</span>
+    </div>
+
+    <div class="top-stats">
+      <div class="stat-pill">
+        <span class="stat-pill-label">Lap Time</span>
+        <span class="stat-pill-val" id="top-lap-time">2:22.72</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-pill-label">Top Speed</span>
+        <span class="stat-pill-val" id="top-max-speed">287.3 km/h</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-pill-label">Peak Lat G</span>
+        <span class="stat-pill-val" id="top-max-latg">2.76 g</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Telemetry HUD Panel -->
+  <div class="telemetry-hud">
+    <!-- Shift Indicator -->
+    <div class="shift-lights-container">
+      <div class="shift-led green" id="led-1"></div>
+      <div class="shift-led green" id="led-2"></div>
+      <div class="shift-led green" id="led-3"></div>
+      <div class="shift-led green" id="led-4"></div>
+      <div class="shift-led amber" id="led-5"></div>
+      <div class="shift-led amber" id="led-6"></div>
+      <div class="shift-led amber" id="led-7"></div>
+      <div class="shift-led amber" id="led-8"></div>
+      <div class="shift-led red"   id="led-9"></div>
+      <div class="shift-led red"   id="led-10"></div>
+      <div class="shift-led red"   id="led-11"></div>
+      <div class="shift-led red"   id="led-12"></div>
+      <div class="shift-led blue"  id="led-13"></div>
+      <div class="shift-led blue"  id="led-14"></div>
+    </div>
+
+    <!-- Speed and Gear -->
+    <div class="speedo-row">
+      <div class="gear-box">
+        <span class="gear-label">GEAR</span>
+        <span class="gear-val" id="hud-gear">1</span>
+      </div>
+      <div class="speed-display">
+        <div class="speed-num" id="hud-speed">0</div>
+        <div class="speed-unit">KM/H &bull; <span id="hud-speed-mps">0.0</span> M/S</div>
+      </div>
+    </div>
+
+    <!-- RPM Bar -->
+    <div class="rpm-container">
+      <div class="rpm-header">
+        <span>ENGINE RPM</span>
+        <span id="hud-rpm">4,000 RPM</span>
+      </div>
+      <div class="rpm-bar-bg">
+        <div class="rpm-bar-fill" id="rpm-fill"></div>
+      </div>
+    </div>
+
+    <!-- Lap Time Clock -->
+    <div class="time-card">
+      <span class="time-clock-label">CURRENT TIME</span>
+      <span class="time-clock-val" id="hud-time">00:00.00</span>
+    </div>
+
+    <!-- Sector Splits -->
+    <div class="sectors-row">
+      <div class="sec-card" id="sec-card-1">
+        <div class="sec-name">SECTOR 1</div>
+        <div class="sec-time" id="sec-val-1">41.79 s</div>
+      </div>
+      <div class="sec-card" id="sec-card-2">
+        <div class="sec-name">SECTOR 2</div>
+        <div class="sec-time" id="sec-val-2">53.28 s</div>
+      </div>
+      <div class="sec-card" id="sec-card-3">
+        <div class="sec-name">SECTOR 3</div>
+        <div class="sec-time" id="sec-val-3">47.65 s</div>
+      </div>
+    </div>
+
+    <!-- Dynamics: G-G Circle + Throttle/Brake Pedals -->
+    <div class="dynamics-row">
+      <div class="gg-box">
+        <canvas id="gg-canvas" class="gg-canvas" width="100" height="100"></canvas>
+      </div>
+
+      <div class="pedals-box">
+        <div class="pedal-col">
+          <div class="pedal-track">
+            <div class="pedal-bar-fill throttle" id="pedal-thr-fill"></div>
+          </div>
+          <span class="pedal-label">THR</span>
+        </div>
+
+        <div class="pedal-col">
+          <div class="pedal-track">
+            <div class="pedal-bar-fill brake" id="pedal-brk-fill"></div>
+          </div>
+          <span class="pedal-label">BRK</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Track Radar Minimap -->
+    <div class="minimap-wrapper">
+      <canvas id="minimap-canvas"></canvas>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation & Controls -->
+  <div class="bottom-bar">
+    <!-- Timeline Slider -->
+    <div class="timeline-container">
+      <input type="range" class="timeline-slider" id="time-slider" min="0" max="142.72" step="0.05" value="0">
+      <div class="timeline-time" id="timeline-label">0.0 / 142.7 s</div>
+    </div>
+
+    <div class="controls-deck">
+      <!-- Playback Controls -->
+      <div class="btn-group">
+        <button class="btn btn-play" id="btn-play">Pause</button>
+        <button class="btn" id="btn-restart">Restart</button>
+        <button class="btn" id="btn-audio">Audio: Off</button>
+      </div>
+
+      <!-- Playback Speed Multipliers -->
+      <div class="btn-group">
+        <button class="btn" data-speed="0.5">0.5x</button>
+        <button class="btn active" data-speed="1.0">1.0x</button>
+        <button class="btn" data-speed="2.0">2.0x</button>
+        <button class="btn" data-speed="4.0">4.0x</button>
+      </div>
+
+      <!-- Camera Views -->
+      <div class="btn-group">
+        <button class="btn active" data-cam="chase">Chase</button>
+        <button class="btn" data-cam="cockpit">Cockpit</button>
+        <button class="btn" data-cam="heli">Aerial</button>
+        <button class="btn" data-cam="tv">Trackside</button>
+        <button class="btn" data-cam="free">Orbit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Simulation Application Logic -->
+  <script>
+    // --- 1. Load Data ---
+    const simData = window.SPA_SIM_DATA || null;
+
+    if (!simData) {
+      alert("Telemetry data not found. Please ensure spa_sim_data.js is generated.");
+    }
+
+    const tel = simData.telemetry;
+    const N = tel.x.length;
+    const totalLapTime = simData.lap_time_s;
+
+    // Track statistics
+    document.getElementById('top-lap-time').textContent = formatLapTime(totalLapTime);
+    document.getElementById('top-max-speed').textContent = simData.max_speed_kmh.toFixed(1) + ' km/h';
+
+    // TV Trackside Camera Positions along Spa
+    const tvCameras = [
+      { s: 250,  pos: [50, 400, 410], name: 'Turn 1 (La Source Hairpin)' },
+      { s: 800,  pos: [-100, 1100, 390], name: 'Eau Rouge Dip & Raidillon' },
+      { s: 1800, pos: [-450, 2400, 460], name: 'Kemmel Straight' },
+      { s: 2300, pos: [-600, 3100, 480], name: 'Les Combes Chicane' },
+      { s: 3100, pos: [-250, 3800, 435], name: 'Bruxelles Downhill Hairpin' },
+      { s: 3900, pos: [350, 4700, 405], name: 'Double-Left Pouhon' },
+      { s: 4800, pos: [700, 5200, 395], name: 'Fagnes Chicane' },
+      { s: 5400, pos: [850, 4800, 385], name: 'Stavelot Corner' },
+      { s: 6200, pos: [300, 3000, 390], name: 'High-Speed Blanchimont' },
+      { s: 6800, pos: [80, 1500, 400], name: 'Bus Stop Chicane & Finish' }
+    ];
+
+    // Landmark callouts
+    function getLandmark(s) {
+      if (s < 400) return 'Turn 1 (La Source Hairpin)';
+      if (s < 1100) return 'Turns 2-4 (Eau Rouge & Raidillon) • +42m climb';
+      if (s < 2100) return 'Kemmel Straight • Top speed acceleration';
+      if (s < 2600) return 'Turns 5-7 (Les Combes & Malmedy) • Peak altitude (473m)';
+      if (s < 3400) return 'Turn 8 (Bruxelles Hairpin)';
+      if (s < 4300) return 'Turns 10-11 (Pouhon) • High-speed double-left';
+      if (s < 5100) return 'Turns 12-13 (Fagnes Chicane)';
+      if (s < 5700) return 'Turn 15 (Stavelot)';
+      if (s < 6500) return 'Turns 16-17 (Blanchimont)';
+      return 'Turns 18-19 (Bus Stop Chicane)';
+    }
+
+    // --- 2. Three.js Scene Setup ---
+    const container = document.getElementById('webgl-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0d14);
+    scene.fog = new THREE.FogExp2(0x0a0d14, 0.00045);
+
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 8000);
+    camera.position.set(0, -20, 10);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.enabled = false; // Enabled only in 'free' camera mode
+
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0x7085a0, 0.8);
+    scene.add(ambientLight);
+
+    const sunLight = new THREE.DirectionalLight(0xfff5e6, 1.4);
+    sunLight.position.set(800, 1200, 1500);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 50;
+    sunLight.shadow.camera.far = 4000;
+    const shadowD = 600;
+    sunLight.shadow.camera.left = -shadowD;
+    sunLight.shadow.camera.right = shadowD;
+    sunLight.shadow.camera.top = shadowD;
+    sunLight.shadow.camera.bottom = -shadowD;
+    scene.add(sunLight);
+
+    // Coordinate conversion:
+    // In our dataset: x = East, y = North, z = Elevation
+    // In Three.js: X = East, Y = Elevation (Up), Z = -North
+    function to3D(x, y, z) {
+      return new THREE.Vector3(x, z, -y);
+    }
+
+    // --- 3. Build 3D Track Ribbon & Terrain ---
+    const trackWidth = 10.0;
+    const roadPointsLeft = [];
+    const roadPointsRight = [];
+    const roadNormals = [];
+
+    // Calculate normal vectors for road width
+    for (let i = 0; i < N; i++) {
+      const nextIdx = (i + 1) % N;
+      const prevIdx = (i - 1 + N) % N;
+      const dx = tel.x[nextIdx] - tel.x[prevIdx];
+      const dy = tel.y[nextIdx] - tel.y[prevIdx];
+      const len = Math.hypot(dx, dy) || 1e-6;
+      const nx = -dy / len;
+      const ny = dx / len;
+
+      const xl = tel.x[i] + (trackWidth / 2) * nx;
+      const yl = tel.y[i] + (trackWidth / 2) * ny;
+      const xr = tel.x[i] - (trackWidth / 2) * nx;
+      const yr = tel.y[i] - (trackWidth / 2) * ny;
+      const z  = tel.z[i];
+
+      roadPointsLeft.push(to3D(xl, yl, z));
+      roadPointsRight.push(to3D(xr, yr, z));
+    }
+
+    // Construct Road Surface Geometry
+    const roadGeom = new THREE.BufferGeometry();
+    const vertices = [];
+    const uvs = [];
+    const indices = [];
+
+    for (let i = 0; i < N; i++) {
+      const vL = roadPointsLeft[i];
+      const vR = roadPointsRight[i];
+      vertices.push(vL.x, vL.y, vL.z);
+      vertices.push(vR.x, vR.y, vR.z);
+
+      const u = tel.s[i] / 5.0; // Texture repeat along track
+      uvs.push(0, u);
+      uvs.push(1, u);
+
+      const i2 = i * 2;
+      const next2 = ((i + 1) % N) * 2;
+      // Two triangles per segment
+      indices.push(i2, i2 + 1, next2);
+      indices.push(i2 + 1, next2 + 1, next2);
+    }
+
+    roadGeom.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    roadGeom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    roadGeom.setIndex(indices);
+    roadGeom.computeVertexNormals();
+
+    const roadMat = new THREE.MeshStandardMaterial({
+      color: 0x1a1c22,
+      roughness: 0.85,
+      metalness: 0.1,
+      side: THREE.DoubleSide
+    });
+    const roadMesh = new THREE.Mesh(roadGeom, roadMat);
+    roadMesh.receiveShadow = true;
+    scene.add(roadMesh);
+
+    // White Border Lines
+    const leftLineGeom = new THREE.BufferGeometry().setFromPoints(roadPointsLeft.map(p => p.clone().add(new THREE.Vector3(0, 0.04, 0))));
+    const rightLineGeom = new THREE.BufferGeometry().setFromPoints(roadPointsRight.map(p => p.clone().add(new THREE.Vector3(0, 0.04, 0))));
+    const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 });
+    scene.add(new THREE.LineLoop(leftLineGeom, lineMat));
+    scene.add(new THREE.LineLoop(rightLineGeom, lineMat));
+
+    // Racing Centerline
+    const centerPoints = [];
+    for (let i = 0; i < N; i++) {
+      centerPoints.push(to3D(tel.x[i], tel.y[i], tel.z[i] + 0.03));
+    }
+    const centerGeom = new THREE.BufferGeometry().setFromPoints(centerPoints);
+    const centerMat = new THREE.LineBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.35 });
+    scene.add(new THREE.LineLoop(centerGeom, centerMat));
+
+    // Apex Kerbs (Red & White striped blocks on sharp corners)
+    const kerbGeom = new THREE.BoxGeometry(0.7, 0.12, 1.8);
+    const kerbMatRed = new THREE.MeshStandardMaterial({ color: 0xee2222, roughness: 0.6 });
+    const kerbMatWhite = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.6 });
+
+    for (let i = 0; i < N; i += 2) {
+      if (Math.abs(tel.lat_g[i]) > 1.2) {
+        // High lateral G corner: place kerb on inside/outside
+        const pL = roadPointsLeft[i];
+        const pR = roadPointsRight[i];
+        const isLeftInside = tel.lat_g[i] > 0;
+        const targetPt = isLeftInside ? pL : pR;
+
+        const kerb = new THREE.Mesh(kerbGeom, ((i % 4) === 0) ? kerbMatRed : kerbMatWhite);
+        kerb.position.copy(targetPt);
+        kerb.position.y += 0.06;
+        kerb.lookAt(centerPoints[(i + 1) % N]);
+        scene.add(kerb);
+      }
+    }
+
+    // Start/Finish Checkered Gantry
+    const gantryGroup = new THREE.Group();
+    const gantryP1 = roadPointsLeft[0];
+    const gantryP2 = roadPointsRight[0];
+    const gantryMid = new THREE.Vector3().addVectors(gantryP1, gantryP2).multiplyScalar(0.5);
+
+    const postMat = new THREE.MeshStandardMaterial({ color: 0x333338, metalness: 0.8, roughness: 0.3 });
+    const beamMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5 });
+
+    const post1 = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 7), postMat);
+    post1.position.copy(gantryP1); post1.position.y += 3.5;
+    const post2 = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 7), postMat);
+    post2.position.copy(gantryP2); post2.position.y += 3.5;
+
+    const span = gantryP1.distanceTo(gantryP2);
+    const crossbeam = new THREE.Mesh(new THREE.BoxGeometry(span, 0.8, 0.8), beamMat);
+    crossbeam.position.copy(gantryMid); crossbeam.position.y += 6.5;
+    crossbeam.lookAt(gantryP2.x, gantryMid.y + 6.5, gantryP2.z);
+
+    gantryGroup.add(post1, post2, crossbeam);
+    scene.add(gantryGroup);
+
+    // Surrounding Green Valley Ground Terrain
+    const groundGeom = new THREE.PlaneGeometry(10000, 10000, 32, 32);
+    const groundMat = new THREE.MeshStandardMaterial({ color: 0x0f1712, roughness: 0.95 });
+    const ground = new THREE.Mesh(groundGeom, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = 350; // Below lowest track point
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // --- 4. Build 3D Formula Race Car Model ---
+    const carGroup = new THREE.Group();
+
+    // Chassis body
+    const carBodyMat = new THREE.MeshStandardMaterial({ color: 0xd61828, roughness: 0.25, metalness: 0.6 });
+    const carbonMat  = new THREE.MeshStandardMaterial({ color: 0x151618, roughness: 0.5, metalness: 0.8 });
+    const tireMat    = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
+    const brakeGlowMat = new THREE.MeshBasicMaterial({ color: 0x000000 }); // Lights up red on braking
+
+    // Nose & monocoque
+    const noseGeom = new THREE.ConeGeometry(0.35, 1.8, 6);
+    const nose = new THREE.Mesh(noseGeom, carBodyMat);
+    nose.rotation.x = Math.PI / 2;
+    nose.position.set(0, 0.35, 0.9);
+    carGroup.add(nose);
+
+    // Main Cockpit Tub
+    const tubGeom = new THREE.BoxGeometry(0.7, 0.45, 1.6);
+    const tub = new THREE.Mesh(tubGeom, carBodyMat);
+    tub.position.set(0, 0.4, -0.4);
+    carGroup.add(tub);
+
+    // Halo Structure
+    const haloGeom = new THREE.TorusGeometry(0.28, 0.035, 8, 16, Math.PI);
+    const halo = new THREE.Mesh(haloGeom, carbonMat);
+    halo.rotation.x = -Math.PI / 2;
+    halo.position.set(0, 0.72, -0.2);
+    carGroup.add(halo);
+
+    // Driver Helmet
+    const helmetGeom = new THREE.SphereGeometry(0.15, 12, 12);
+    const helmetMat = new THREE.MeshStandardMaterial({ color: 0xffd600, roughness: 0.3 });
+    const helmet = new THREE.Mesh(helmetGeom, helmetMat);
+    helmet.position.set(0, 0.65, -0.35);
+    carGroup.add(helmet);
+
+    // Front Wing
+    const fwGeom = new THREE.BoxGeometry(1.6, 0.05, 0.4);
+    const frontWing = new THREE.Mesh(fwGeom, carbonMat);
+    frontWing.position.set(0, 0.18, 1.7);
+    carGroup.add(frontWing);
+
+    // Rear Wing
+    const rwGeom = new THREE.BoxGeometry(1.4, 0.06, 0.35);
+    const rearWing = new THREE.Mesh(rwGeom, carbonMat);
+    rearWing.position.set(0, 0.9, -1.3);
+    const rwPillar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 0.2), carbonMat);
+    rwPillar.position.set(0, 0.65, -1.25);
+    carGroup.add(rearWing, rwPillar);
+
+    // 4 Wheels
+    const wheels = [];
+    const wheelGeom = new THREE.CylinderGeometry(0.24, 0.24, 0.22, 16);
+    const wheelPositions = [
+      [-0.7, 0.24, 1.0],  // Front Left
+      [ 0.7, 0.24, 1.0],  // Front Right
+      [-0.75, 0.26, -0.9], // Rear Left
+      [ 0.75, 0.26, -0.9]  // Rear Right
+    ];
+
+    wheelPositions.forEach(pos => {
+      const wGroup = new THREE.Group();
+      const tire = new THREE.Mesh(wheelGeom, tireMat);
+      tire.rotation.z = Math.PI / 2;
+      tire.castShadow = true;
+      wGroup.add(tire);
+      wGroup.position.set(pos[0], pos[1], pos[2]);
+      carGroup.add(wGroup);
+      wheels.push(wGroup);
+    });
+
+    // Rear Rain / Brake Light
+    const rainLight = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.05), brakeGlowMat);
+    rainLight.position.set(0, 0.35, -1.35);
+    carGroup.add(rainLight);
+
+    carGroup.castShadow = true;
+    scene.add(carGroup);
+
+    // --- 5. Sound Engine (Web Audio API) ---
+    let audioCtx = null;
+    let osc1 = null, osc2 = null, gainNode = null;
+    let audioEnabled = false;
+
+    function initAudio() {
+      if (audioCtx) return;
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+
+        gainNode = audioCtx.createGain();
+        gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gainNode.connect(audioCtx.destination);
+
+        // Low rumble
+        osc1 = audioCtx.createOscillator();
+        osc1.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(80, audioCtx.currentTime);
+        osc1.connect(gainNode);
+        osc1.start();
+
+        // High scream
+        osc2 = audioCtx.createOscillator();
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(160, audioCtx.currentTime);
+        osc2.connect(gainNode);
+        osc2.start();
+
+        audioEnabled = true;
+        document.getElementById('btn-audio').textContent = 'Audio: On';
+        document.getElementById('btn-audio').classList.add('active');
+      } catch (e) {
+        console.warn("Audio init prevented:", e);
+      }
+    }
+
+    function updateAudio(rpm, throttle) {
+      if (!audioEnabled || !audioCtx) return;
+      const baseFreq = 40 + (rpm / 12500) * 260;
+      osc1.frequency.setTargetAtTime(baseFreq, audioCtx.currentTime, 0.05);
+      osc2.frequency.setTargetAtTime(baseFreq * 2, audioCtx.currentTime, 0.05);
+      const vol = 0.04 + (throttle * 0.08);
+      gainNode.gain.setTargetAtTime(vol, audioCtx.currentTime, 0.05);
+    }
+
+    document.getElementById('btn-audio').addEventListener('click', () => {
+      if (!audioCtx) {
+        initAudio();
+      } else if (audioEnabled) {
+        audioCtx.suspend();
+        audioEnabled = false;
+        document.getElementById('btn-audio').textContent = 'Audio: Off';
+        document.getElementById('btn-audio').classList.remove('active');
+      } else {
+        audioCtx.resume();
+        audioEnabled = true;
+        document.getElementById('btn-audio').textContent = 'Audio: On';
+        document.getElementById('btn-audio').classList.add('active');
+      }
+    });
+
+    // --- 6. Telemetry HUD Drawing (G-G Circle & Minimap) ---
+    const ggCanvas = document.getElementById('gg-canvas');
+    const ggCtx = ggCanvas.getContext('2d');
+
+    function drawGGCircle(latG, lonG) {
+      const w = ggCanvas.width, h = ggCanvas.height;
+      ggCtx.clearRect(0, 0, w, h);
+      const cx = w / 2, cy = h / 2;
+      const scale = 24; // pixels per g
+
+      // 1.0g and 1.6g rings
+      ggCtx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ggCtx.lineWidth = 1;
+      ggCtx.beginPath(); ggCtx.arc(cx, cy, 1.0 * scale, 0, Math.PI * 2); ggCtx.stroke();
+
+      ggCtx.strokeStyle = 'rgba(255,255,255,0.2)';
+      ggCtx.setLineDash([2, 2]);
+      ggCtx.beginPath(); ggCtx.arc(cx, cy, 1.6 * scale, 0, Math.PI * 2); ggCtx.stroke();
+      ggCtx.setLineDash([]);
+
+      // Crosshairs
+      ggCtx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ggCtx.beginPath();
+      ggCtx.moveTo(cx, 0); ggCtx.lineTo(cx, h);
+      ggCtx.moveTo(0, cy); ggCtx.lineTo(w, cy);
+      ggCtx.stroke();
+
+      // Current G point (X = Lat, Y = -Lon)
+      const px = cx + latG * scale;
+      const py = cy - lonG * scale;
+
+      ggCtx.fillStyle = '#38bdf8';
+      ggCtx.beginPath(); ggCtx.arc(px, py, 3.5, 0, Math.PI * 2); ggCtx.fill();
+    }
+
+    // Minimap Canvas
+    const miniCanvas = document.getElementById('minimap-canvas');
+    const miniCtx = miniCanvas.getContext('2d');
+    let mapMinX, mapMaxX, mapMinY, mapMaxY;
+
+    function initMinimap() {
+      miniCanvas.width = miniCanvas.clientWidth * 2;
+      miniCanvas.height = miniCanvas.clientHeight * 2;
+      mapMinX = Math.min(...tel.x); mapMaxX = Math.max(...tel.x);
+      mapMinY = Math.min(...tel.y); mapMaxY = Math.max(...tel.y);
+    }
+    window.addEventListener('resize', initMinimap);
+    initMinimap();
+
+    function drawMinimap(curX, curY) {
+      const w = miniCanvas.width, h = miniCanvas.height;
+      miniCtx.clearRect(0, 0, w, h);
+
+      const pad = 14;
+      const sx = (w - pad * 2) / (mapMaxX - mapMinX);
+      const sy = (h - pad * 2) / (mapMaxY - mapMinY);
+      const scale = Math.min(sx, sy);
+
+      function mapProj(x, y) {
+        return [
+          pad + (x - mapMinX) * scale + (w - pad * 2 - (mapMaxX - mapMinX) * scale) / 2,
+          h - (pad + (y - mapMinY) * scale + (h - pad * 2 - (mapMaxY - mapMinY) * scale) / 2)
+        ];
+      }
+
+      // Draw circuit track outline
+      miniCtx.strokeStyle = 'rgba(255,255,255,0.25)';
+      miniCtx.lineWidth = 1.5;
+      miniCtx.beginPath();
+      for (let i = 0; i < N; i++) {
+        const [mx, my] = mapProj(tel.x[i], tel.y[i]);
+        if (i === 0) miniCtx.moveTo(mx, my);
+        else miniCtx.lineTo(mx, my);
+      }
+      miniCtx.closePath();
+      miniCtx.stroke();
+
+      // Moving Car Blip
+      const [carMx, carMy] = mapProj(curX, curY);
+      miniCtx.fillStyle = '#38bdf8';
+      miniCtx.beginPath();
+      miniCtx.arc(carMx, carMy, 3.5, 0, Math.PI * 2);
+      miniCtx.fill();
+    }
+
+    // --- 7. State & Playback Simulation Loop ---
+    let simTime = 0;
+    let isPlaying = true;
+    let timeScale = 1.0;
+    let activeCam = 'chase';
+    let currentTvCamIdx = 0;
+    let lastClockTime = performance.now();
+
+    // Helper: Interpolation along cumulative time array
+    function findTimeIndex(targetTime) {
+      let low = 0, high = N - 1;
+      while (low <= high) {
+        const mid = (low + high) >> 1;
+        if (tel.time[mid] < targetTime) low = mid + 1;
+        else high = mid - 1;
+      }
+      return Math.max(0, Math.min(N - 2, low - 1));
+    }
+
+    function formatLapTime(sec) {
+      const m = Math.floor(sec / 60);
+      const s = (sec % 60).toFixed(2);
+      return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    // UI Elements cache
+    const hudGear = document.getElementById('hud-gear');
+    const hudSpeed = document.getElementById('hud-speed');
+    const hudSpeedMps = document.getElementById('hud-speed-mps');
+    const hudRpm = document.getElementById('hud-rpm');
+    const rpmFill = document.getElementById('rpm-fill');
+    const hudTime = document.getElementById('hud-time');
+    const pedalThr = document.getElementById('pedal-thr-fill');
+    const pedalBrk = document.getElementById('pedal-brk-fill');
+    const timeSlider = document.getElementById('time-slider');
+    const timeLabel = document.getElementById('timeline-label');
+    const landmarkBadge = document.getElementById('landmark-text');
+
+    // Shift light array elements
+    const shiftLeds = [];
+    for (let i = 1; i <= 14; i++) shiftLeds.push(document.getElementById(`led-${i}`));
+
+    function updateShiftLights(rpm) {
+      const activeCount = Math.floor(Math.max(0, (rpm - 6000) / (12200 - 6000)) * 14);
+      shiftLeds.forEach((led, idx) => {
+        if (idx < activeCount) led.classList.add('active');
+        else led.classList.remove('active');
+      });
+    }
+
+    // Main Simulation Tick (60 fps WebGL animation)
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const now = performance.now();
+      const dt = (now - lastClockTime) / 1000;
+      lastClockTime = now;
+
+      if (isPlaying) {
+        simTime += dt * timeScale;
+        if (simTime > totalLapTime) simTime = 0; // Seamless lap loop
+      }
+
+      // Find current waypoint slice
+      const i0 = findTimeIndex(simTime);
+      const i1 = i0 + 1;
+      const t0 = tel.time[i0], t1 = tel.time[i1];
+      const alpha = (t1 > t0) ? (simTime - t0) / (t1 - t0) : 0;
+
+      // Interpolate state
+      const curX = tel.x[i0] + (tel.x[i1] - tel.x[i0]) * alpha;
+      const curY = tel.y[i0] + (tel.y[i1] - tel.y[i0]) * alpha;
+      const curZ = tel.z[i0] + (tel.z[i1] - tel.z[i0]) * alpha;
+      const curSpeed = tel.speed_kmh[i0] + (tel.speed_kmh[i1] - tel.speed_kmh[i0]) * alpha;
+      const curSpeedMps = tel.speed_mps[i0] + (tel.speed_mps[i1] - tel.speed_mps[i0]) * alpha;
+      const curLatG = tel.lat_g[i0] + (tel.lat_g[i1] - tel.lat_g[i0]) * alpha;
+      const curLonG = tel.lon_g[i0] + (tel.lon_g[i1] - tel.lon_g[i0]) * alpha;
+      const curThr = tel.throttle[i0] + (tel.throttle[i1] - tel.throttle[i0]) * alpha;
+      const curBrk = tel.brake[i0] + (tel.brake[i1] - tel.brake[i0]) * alpha;
+      const curRpm = tel.rpm[i0];
+      const curGear = tel.gear[i0];
+      const curS = tel.s[i0];
+
+      // Convert position to 3D world space
+      const carPos = to3D(curX, curY, curZ);
+      carGroup.position.copy(carPos);
+
+      // Determine vehicle heading and pitch orientation
+      const nextPos = to3D(tel.x[i1], tel.y[i1], tel.z[i1]);
+      const forwardVec = new THREE.Vector3().subVectors(nextPos, carPos).normalize();
+      if (forwardVec.lengthSq() > 0.001) {
+        const targetLook = carPos.clone().add(forwardVec);
+        carGroup.lookAt(targetLook);
+      }
+
+      // Add dynamic body roll into turns (proportional to lateral g)
+      carGroup.rotation.z = -curLatG * 0.04;
+      // Add dynamic pitch on braking/acceleration
+      carGroup.rotation.x += curLonG * 0.02;
+
+      // Wheel rotation based on speed
+      const wheelRotSpeed = (curSpeedMps / 0.23) * dt;
+      wheels.forEach(w => {
+        w.children[0].rotation.x += wheelRotSpeed;
+      });
+
+      // Brake glow effect
+      if (curBrk > 0.15) {
+        brakeGlowMat.color.setHex(0xff1111);
+      } else {
+        brakeGlowMat.color.setHex(0x000000);
+      }
+
+      // Camera Modes
+      if (activeCam === 'chase') {
+        const backDist = 9.5;
+        const heightDist = 3.2;
+        const camOffset = forwardVec.clone().multiplyScalar(-backDist).add(new THREE.Vector3(0, heightDist, 0));
+        const desiredCamPos = carPos.clone().add(camOffset);
+        camera.position.lerp(desiredCamPos, 0.12);
+        const lookTarget = carPos.clone().add(forwardVec.clone().multiplyScalar(14)).add(new THREE.Vector3(0, 0.8, 0));
+        camera.lookAt(lookTarget);
+      } else if (activeCam === 'cockpit') {
+        const driverEye = carPos.clone().add(new THREE.Vector3(0, 0.72, 0)).add(forwardVec.clone().multiplyScalar(0.2));
+        camera.position.copy(driverEye);
+        const lookAhead = carPos.clone().add(forwardVec.clone().multiplyScalar(40)).add(new THREE.Vector3(0, 0.5, 0));
+        camera.lookAt(lookAhead);
+      } else if (activeCam === 'heli') {
+        const heliPos = carPos.clone().add(new THREE.Vector3(25, 30, -25));
+        camera.position.lerp(heliPos, 0.06);
+        camera.lookAt(carPos);
+      } else if (activeCam === 'tv') {
+        // Find nearest TV camera along circuit
+        let bestCam = tvCameras[0];
+        let minDiff = 999999;
+        tvCameras.forEach(cam => {
+          let diff = cam.s - curS;
+          if (diff < 0) diff += simData.track_length_m;
+          if (diff < minDiff) {
+            minDiff = diff;
+            bestCam = cam;
+          }
+        });
+        const tvPos = to3D(bestCam.pos[0], bestCam.pos[1], bestCam.pos[2]);
+        camera.position.lerp(tvPos, 0.08);
+        camera.lookAt(carPos);
+      } else if (activeCam === 'free') {
+        controls.target.copy(carPos);
+        controls.update();
+      }
+
+      // Update HUD UI
+      hudSpeed.textContent = Math.round(curSpeed);
+      hudSpeedMps.textContent = curSpeedMps.toFixed(1);
+      hudGear.textContent = curGear;
+      hudRpm.textContent = `${curRpm.toLocaleString()} RPM`;
+      rpmFill.style.width = `${Math.min(100, Math.max(5, (curRpm / 12500) * 100))}%`;
+      hudTime.textContent = formatLapTime(simTime);
+      pedalThr.style.height = `${Math.round(curThr * 100)}%`;
+      pedalBrk.style.height = `${Math.round(curBrk * 100)}%`;
+
+      updateShiftLights(curRpm);
+      drawGGCircle(curLatG, curLonG);
+      drawMinimap(curX, curY);
+      updateAudio(curRpm, curThr);
+
+      // Timeline update
+      timeSlider.value = simTime;
+      timeLabel.textContent = `${simTime.toFixed(1)} / ${totalLapTime.toFixed(1)} s`;
+
+      // Sector highlighting
+      const sFrac = curS / simData.track_length_m;
+      document.getElementById('sec-card-1').classList.toggle('current', sFrac < 0.333);
+      document.getElementById('sec-card-2').classList.toggle('current', sFrac >= 0.333 && sFrac < 0.666);
+      document.getElementById('sec-card-3').classList.toggle('current', sFrac >= 0.666);
+
+      // Landmark callout
+      landmarkBadge.textContent = getLandmark(curS);
+
+      renderer.render(scene, camera);
+    }
+
+    // --- 8. Event Listeners & UI Controls ---
+    const btnPlay = document.getElementById('btn-play');
+    btnPlay.addEventListener('click', () => {
+      isPlaying = !isPlaying;
+      btnPlay.textContent = isPlaying ? 'Pause' : 'Play';
+      if (isPlaying && !audioCtx) initAudio();
+    });
+
+    document.getElementById('btn-restart').addEventListener('click', () => {
+      simTime = 0;
+    });
+
+    // Speed multiplier buttons
+    document.querySelectorAll('[data-speed]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-speed]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        timeScale = parseFloat(btn.getAttribute('data-speed'));
+      });
+    });
+
+    // Camera mode buttons
+    document.querySelectorAll('[data-cam]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-cam]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeCam = btn.getAttribute('data-cam');
+        controls.enabled = (activeCam === 'free');
+      });
+    });
+
+    // Timeline Scrubber
+    timeSlider.addEventListener('input', (e) => {
+      simTime = parseFloat(e.target.value);
+    });
+
+    // Keyboard Shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        btnPlay.click();
+      } else if (e.key === 'c' || e.key === 'C') {
+        const modes = ['chase', 'cockpit', 'heli', 'tv', 'free'];
+        const nextIdx = (modes.indexOf(activeCam) + 1) % modes.length;
+        document.querySelector(`[data-cam="${modes[nextIdx]}"]`).click();
+      }
+    });
+
+    // Window Resize Handler
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Start Simulation
+    animate();
+  </script>
+</body>
+</html>

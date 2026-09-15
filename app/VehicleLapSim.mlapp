@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AppDesigner>
+  <Version>5.4</Version>
+  <Designer>
+    <Components>
+      <Component type="uifigure" name="Figure" Position="[100 100 1200 800]" Name="VehicleLapSimFig">
+        <Children>
+          <Component type="uilabel" name="TitleLabel" Position="[20 750 400 30]" Text="Vehicle Dynamics &amp; Lap‑Time Simulator" FontSize="16" FontWeight="bold"/>
+          <!-- Vehicle parameter inputs -->
+          <Component type="uilabel" name="MassLabel" Position="[20 700 100 22]" Text="Mass (kg):"/>
+          <Component type="uieditfield" name="MassEdit" Position="[130 700 100 22]" Value="250"/>
+          <Component type="uilabel" name="TireMuLabel" Position="[260 700 100 22]" Text="Tire μ:"/>
+          <Component type="uieditfield" name="TireMuEdit" Position="[370 700 100 22]" Value="1.0"/>
+          <Component type="uilabel" name="CdLabel" Position="[500 700 100 22]" Text="Cd:"/>
+          <Component type="uieditfield" name="CdEdit" Position="[610 700 100 22]" Value="0.6"/>
+          <Component type="uilabel" name="ClLabel" Position="[740 700 100 22]" Text="Cl:"/>
+          <Component type="uieditfield" name="ClEdit" Position="[850 700 100 22]" Value="0.3"/>
+          <Component type="uilabel" name="FrontalAreaLabel" Position="[980 700 120 22]" Text="Frontal Area (m²):"/>
+          <Component type="uieditfield" name="FrontalAreaEdit" Position="[1110 700 80 22]" Value="0.5"/>
+
+          <Component type="uilabel" name="PowerLabel" Position="[20 660 100 22]" Text="Power (W):"/>
+          <Component type="uieditfield" name="PowerEdit" Position="[130 660 100 22]" Value="50000"/>
+          <Component type="uilabel" name="BrakeForceLabel" Position="[260 660 120 22]" Text="Brake Max (N):"/>
+          <Component type="uieditfield" name="BrakeForceEdit" Position="[390 660 100 22]" Value="8000"/>
+          <Component type="uilabel" name="WheelRadiusLabel" Position="[520 660 120 22]" Text="Wheel Radius (m):"/>
+          <Component type="uieditfield" name="WheelRadiusEdit" Position="[650 660 100 22]" Value="0.3"/>
+
+          <!-- Track file selector -->
+          <Component type="uilabel" name="TrackFileLabel" Position="[20 620 100 22]" Text="Track CSV:"/>
+          <Component type="uitextarea" name="TrackFilePath" Position="[130 620 800 22]" Value="data/example_track.csv" Editable="off"/>
+          <Component type="uibutton" name="BrowseButton" Position="[940 620 80 22]" Text="Browse..."/>
+
+          <!-- Run simulation button -->
+          <Component type="uibutton" name="RunButton" Position="[20 580 120 30]" Text="Run Simulation"/>
+
+          <!-- Result display labels -->
+          <Component type="uilabel" name="LapTimeLabel" Position="[20 540 300 22]" Text="Lap Time (s):"/>
+          <Component type="uilabel" name="LapTimeValue" Position="[130 540 100 22]" Text="-"/>
+          <Component type="uilabel" name="AvgSpeedLabel" Position="[260 540 200 22]" Text="Average Speed (m/s):"/>
+          <Component type="uilabel" name="AvgSpeedValue" Position="[470 540 100 22]" Text="-"/>
+          <Component type="uilabel" name="MaxSpeedLabel" Position="[580 540 200 22]" Text="Max Speed (m/s):"/>
+          <Component type="uilabel" name="MaxSpeedValue" Position="[790 540 100 22]" Text="-"/>
+          <Component type="uilabel" name="MaxLatAccLabel" Position="[20 500 250 22]" Text="Max Lateral Acc (m/s²):"/>
+          <Component type="uilabel" name="MaxLatAccValue" Position="[280 500 100 22]" Text="-"/>
+          <Component type="uilabel" name="MaxLongAccLabel" Position="[400 500 260 22]" Text="Max Longitudinal Acc (m/s²):"/>
+          <Component type="uilabel" name="MaxLongAccValue" Position="[670 500 100 22]" Text="-"/>
+
+          <!-- Axes for plots -->
+          <Component type="uiaxes" name="TrackMapAxes" Position="[20 20 350 460]" Title="Track Map (Speed)"/> 
+          <Component type="uiaxes" name="SpeedDistAxes" Position="[390 20 350 460]" Title="Speed vs Distance"/>
+          <Component type="uiaxes" name="LatAccAxes" Position="[760 20 350 460]" Title="Lateral Acc vs Distance"/>
+          <Component type="uiaxes" name="LongAccAxes" Position="[1130 20 350 460]" Title="Longitudinal Acc vs Distance"/>
+        </Children>
+      </Component>
+    </Components>
+  </Designer>
+  <Code>
+    <Methods>
+      <Method name="startupFcn" access="private">
+        <Code><![CDATA[
+function startupFcn(app)
+    % Set default values (already set in component properties)
+    % No additional init needed.
+end
+]]></Code>
+      </Method>
+      <Method name="BrowseButtonPushed" access="private">
+        <Code><![CDATA[
+function BrowseButtonPushed(app, event)
+    [file, path] = uigetfile('*.csv','Select Track CSV');
+    if isequal(file,0)
+        return; % user cancelled
+    end
+    fullpath = fullfile(path, file);
+    app.TrackFilePath.Value = fullpath;
+end
+]]></Code>
+      </Method>
+      <Method name="RunButtonPushed" access="private">
+        <Code><![CDATA[
+function RunButtonPushed(app, event)
+    % Build vehicle struct from UI values
+    vehicle.mass_kg           = str2double(app.MassEdit.Value);
+    vehicle.tire_mu           = str2double(app.TireMuEdit.Value);
+    vehicle.Cd                = str2double(app.CdEdit.Value);
+    vehicle.Cl                = str2double(app.ClEdit.Value);
+    vehicle.frontal_area_m2  = str2double(app.FrontalAreaEdit.Value);
+    vehicle.air_density_kgm3 = 1.225; % standard sea‑level
+    vehicle.power_W          = str2double(app.PowerEdit.Value);
+    vehicle.brake_max_N      = str2double(app.BrakeForceEdit.Value);
+    vehicle.wheel_radius_m   = str2double(app.WheelRadiusEdit.Value);
+
+    % Run simulation (path may be relative to project root)
+    results = runSimulation(app.TrackFilePath.Value, vehicle);
+
+    % Update result labels
+    app.LapTimeValue.Text      = sprintf('%.2f', results.lap_time_s);
+    app.AvgSpeedValue.Text    = sprintf('%.2f', results.average_speed_mps);
+    app.MaxSpeedValue.Text    = sprintf('%.2f', results.max_speed_mps);
+    app.MaxLatAccValue.Text   = sprintf('%.2f', max(results.lateral_acc_mps2));
+    app.MaxLongAccValue.Text  = sprintf('%.2f', max(abs(results.longitudinal_acc_mps2)));
+
+    % Plot visualizations directly onto UIAxes
+    % 1. Track map coloured by speed
+    axes(app.TrackMapAxes);
+    scatter(results.track.x, results.track.y, 20, results.speed_profile_mps, 'filled');
+    colormap(app.TrackMapAxes, jet);
+    colorbar('peer', app.TrackMapAxes, 'Label', struct('String','Speed (m/s)'));
+    axis(app.TrackMapAxes, 'equal'); grid(app.TrackMapAxes, 'on');
+    title(app.TrackMapAxes, 'Track Map (Speed)');
+
+    % 2. Speed vs distance
+    axes(app.SpeedDistAxes);
+    plot(results.track.s, results.speed_profile_mps, '-b', 'LineWidth', 1.5);
+    grid(app.SpeedDistAxes, 'on'); box(app.SpeedDistAxes, 'on');
+    title(app.SpeedDistAxes, 'Speed vs Distance');
+    xlabel(app.SpeedDistAxes, 'Distance s (m)'); ylabel(app.SpeedDistAxes, 'Speed (m/s)');
+
+    % 3. Lateral acceleration vs distance
+    axes(app.LatAccAxes);
+    plot(results.track.s, results.lateral_acc_mps2, '-r', 'LineWidth', 1.5);
+    grid(app.LatAccAxes, 'on'); box(app.LatAccAxes, 'on');
+    title(app.LatAccAxes, 'Lateral Acceleration');
+    xlabel(app.LatAccAxes, 'Distance s (m)'); ylabel(app.LatAccAxes, 'a_{lat} (m/s²)');
+
+    % 4. Longitudinal acceleration vs distance
+    axes(app.LongAccAxes);
+    plot(results.track.s, results.longitudinal_acc_mps2, '-g', 'LineWidth', 1.5);
+    grid(app.LongAccAxes, 'on'); box(app.LongAccAxes, 'on');
+    title(app.LongAccAxes, 'Longitudinal Acceleration');
+    xlabel(app.LongAccAxes, 'Distance s (m)'); ylabel(app.LongAccAxes, 'a_{long} (m/s²)');
+end
+]]></Code>
+      </Method>
+    </Methods>
+    <Properties>
+      <Property name="Vehicle" access="public" />
+    </Properties>
+  </Code>
+</AppDesigner>

@@ -1,0 +1,7 @@
+*.asv
+*.mat
+slprj/
+*.autosave
+octave-workspace
+Thumbs.db
+.DS_Store
