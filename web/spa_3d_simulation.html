@@ -129,6 +129,151 @@
       font-variant-numeric: tabular-nums;
     }
 
+    /* What-If Panel (Left Docked Panel) */
+    .whatif-toggle {
+      position: absolute;
+      top: 58px;
+      left: 16px;
+      z-index: 11;
+      background: var(--panel-bg);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 9px 14px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: var(--font-ui);
+      color: var(--text-main);
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+
+    .whatif-toggle:hover {
+      background: rgba(255,255,255,0.1);
+    }
+
+    .whatif-panel {
+      position: absolute;
+      top: 58px;
+      left: 16px;
+      z-index: 11;
+      width: 270px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+
+    .whatif-panel.hidden {
+      opacity: 0;
+      transform: translateX(-16px);
+      pointer-events: none;
+    }
+
+    .whatif-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .whatif-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: var(--text-main);
+    }
+
+    .whatif-close {
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 18px;
+      line-height: 1;
+      background: none;
+      border: none;
+      padding: 0;
+    }
+
+    .whatif-close:hover {
+      color: var(--text-main);
+    }
+
+    .whatif-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .whatif-row-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--font-ui);
+    }
+
+    .whatif-row-label .val {
+      color: var(--accent-blue);
+      font-weight: 600;
+      font-family: var(--font-mono);
+    }
+
+    .whatif-slider {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255,255,255,0.12);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .whatif-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent-blue);
+      cursor: pointer;
+      border: 2px solid #0a0d12;
+    }
+
+    .whatif-delta-box {
+      border-top: 1px solid var(--panel-border);
+      padding-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .whatif-delta-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .whatif-delta-val {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--text-main);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .whatif-delta-val.faster { color: var(--accent-green); }
+    .whatif-delta-val.slower { color: var(--accent-red); }
+
+    @media (max-width: 900px) {
+      .whatif-panel, .whatif-toggle {
+        display: none;
+      }
+    }
+
     /* Telemetry HUD (Right Docked Panel) */
     .telemetry-hud {
       position: absolute;
@@ -585,6 +730,43 @@
     </div>
   </div>
 
+  <!-- What-If Panel: client-side physics solver, no MATLAB required -->
+  <button class="whatif-toggle" id="whatif-toggle">&#9881; What-If Setup</button>
+  <div class="whatif-panel hidden" id="whatif-panel">
+    <div class="whatif-header">
+      <span class="whatif-title">WHAT-IF: VEHICLE SETUP</span>
+      <button class="whatif-close" id="whatif-close">&times;</button>
+    </div>
+
+    <div class="whatif-row">
+      <div class="whatif-row-label"><span>Mass</span><span class="val" id="wi-mass-val">1200 kg</span></div>
+      <input type="range" class="whatif-slider" id="wi-mass" min="900" max="1500" step="10" value="1200">
+    </div>
+
+    <div class="whatif-row">
+      <div class="whatif-row-label"><span>Aero Package (Drag&harr;Downforce)</span><span class="val" id="wi-aero-val">1.00&times;</span></div>
+      <input type="range" class="whatif-slider" id="wi-aero" min="0.6" max="1.6" step="0.02" value="1.0">
+    </div>
+
+    <div class="whatif-row">
+      <div class="whatif-row-label"><span>Tire &mu;</span><span class="val" id="wi-mu-val">1.60</span></div>
+      <input type="range" class="whatif-slider" id="wi-mu" min="0.8" max="2.0" step="0.02" value="1.6">
+    </div>
+
+    <div class="whatif-row">
+      <div class="whatif-row-label"><span>Engine Power</span><span class="val" id="wi-power-val">100%</span></div>
+      <input type="range" class="whatif-slider" id="wi-power" min="80" max="120" step="1" value="100">
+    </div>
+
+    <div class="whatif-delta-box">
+      <div class="whatif-delta-row"><span>Baseline</span><span class="whatif-delta-val" id="wi-baseline-time">--</span></div>
+      <div class="whatif-delta-row"><span>Current</span><span class="whatif-delta-val" id="wi-current-time">--</span></div>
+      <div class="whatif-delta-row"><span>&Delta; Lap Time</span><span class="whatif-delta-val" id="wi-delta-time">+0.00 s</span></div>
+    </div>
+
+    <button class="btn btn-play" id="wi-reset">Reset to Baseline</button>
+  </div>
+
   <!-- Telemetry HUD Panel -->
   <div class="telemetry-hud">
     <!-- Shift Indicator -->
@@ -725,11 +907,295 @@
 
     const tel = simData.telemetry;
     const N = tel.x.length;
-    const totalLapTime = simData.lap_time_s;
+    let totalLapTime = simData.lap_time_s;
 
     // Track statistics
     document.getElementById('top-lap-time').textContent = formatLapTime(totalLapTime);
     document.getElementById('top-max-speed').textContent = simData.max_speed_kmh.toFixed(1) + ' km/h';
+    document.getElementById('top-max-latg').textContent =
+      Math.max(...tel.lat_g.map(Math.abs)).toFixed(2) + ' g';
+
+    // --- What-If Panel: client-side physics solver ---
+    // Ports calculateCorneringSpeed.m / calculateSpeedProfile.m / calculateLapTime.m
+    // (linear Coulomb tire model) so the sliders re-solve the whole lap in the
+    // browser -- no MATLAB needed. The MATLAB source of truth defaults to the
+    // nonlinear Pacejka model (src/physics/calculatePacejkaTire.m); this demo
+    // trades that nonlinearity for a mu the recruiter can literally drag.
+    const WI_G = 9.81;
+    const WI_C_RR = 0.015;
+
+    const track = { s: tel.s, ds: simData.track_ds, kappa: simData.track_kappa };
+    const baseVehicle = simData.vehicle_baseline;
+    const baselineLapTime = totalLapTime;
+    let currentVehicle = baseVehicle;
+
+    function speedToColor(kmh) {
+      // Domain covers this car's realistic range (~55-180 km/h baseline,
+      // up to ~210 with the What-If sliders maxed out).
+      const t = Math.max(0, Math.min(1, (kmh - 40) / (210 - 40)));
+      const hue = 210 - t * 210; // 210 blue (slow) -> 0 red (fast)
+      return `hsl(${hue}, 85%, 55%)`;
+    }
+
+    function interp1Linear(xs, ys, xq) {
+      if (xq <= xs[0]) return ys[0];
+      if (xq >= xs[xs.length - 1]) return ys[ys.length - 1];
+      let lo = 0, hi = xs.length - 1;
+      while (hi - lo > 1) {
+        const mid = (lo + hi) >> 1;
+        if (xs[mid] <= xq) lo = mid; else hi = mid;
+      }
+      const t = (xq - xs[lo]) / (xs[hi] - xs[lo]);
+      return ys[lo] + t * (ys[hi] - ys[lo]);
+    }
+
+    // Port of calculateVehicleForces.m (linear tire branch + gearbox torque curve).
+    function vehicleForces(vehicle, v) {
+      const qA = 0.5 * vehicle.air_density_kgm3 * vehicle.frontal_area_m2 * v * v;
+      const F_drag = vehicle.Cd * qA;
+      const F_down = vehicle.Cl * qA;
+      const F_normal = vehicle.mass_kg * WI_G + F_down;
+      const F_trac_max = vehicle.tire_mu * F_normal;
+      const F_roll = WI_C_RR * vehicle.mass_kg * WI_G;
+
+      const r = vehicle.wheel_radius_m;
+      const omega_w = Math.max(v, 0.1) / r;
+      let bestF = 0;
+      for (let k = 0; k < vehicle.gear_ratios.length; k++) {
+        const ratio = vehicle.gear_ratios[k] * vehicle.final_drive;
+        let rpm = omega_w * ratio * 60 / (2 * Math.PI);
+        if (rpm > vehicle.torque_rpm[vehicle.torque_rpm.length - 1]) continue; // over-revved; would have shifted up
+        rpm = Math.max(vehicle.torque_rpm[0], rpm); // idle/lugging floor
+        const T = interp1Linear(vehicle.torque_rpm, vehicle.torque_Nm, rpm);
+        const Fw = T * ratio * vehicle.transmission_eff / r;
+        if (Fw > bestF) bestF = Fw;
+      }
+      const F_power = Math.min(bestF, F_trac_max);
+      const F_brake_max = Math.min(vehicle.brake_max_N, F_trac_max);
+
+      return { F_drag, F_roll, F_trac_max, F_power, F_brake_max };
+    }
+
+    // Port of calculateCorneringSpeed.m
+    function corneringSpeed(vehicle, kappaArr) {
+      const K_aero = vehicle.tire_mu * 0.5 * vehicle.air_density_kgm3 *
+        vehicle.Cl * vehicle.frontal_area_m2 / vehicle.mass_kg;
+      return kappaArr.map(k => {
+        const kc = Math.abs(k);
+        const denom = kc - K_aero;
+        return (kc > 1e-8 && denom > 1e-8) ? Math.sqrt(vehicle.tire_mu * WI_G / denom) : Infinity;
+      });
+    }
+
+    // Port of calculateSpeedProfile.m (forward accel pass + backward brake
+    // pass, friction-circle limited, iterated to convergence).
+    function speedProfile(trk, vehicle, vCorner) {
+      const n = trk.s.length;
+      const ds = trk.ds, kappa = trk.kappa;
+
+      const finiteVc = vCorner.filter(Number.isFinite);
+      const vInit = finiteVc.reduce((a, b) => a + b, 0) / Math.max(finiteVc.length, 1);
+      let speed = vCorner.map(v => Number.isFinite(v) ? Math.min(v, vInit) : vInit);
+
+      const vFwd = new Array(n), vBwd = new Array(n);
+
+      for (let iter = 0; iter < 8; iter++) {
+        const speedPrev = speed.slice();
+
+        vFwd[0] = speed[n - 1]; // closed-loop track: lap entry = previous lap exit
+        for (let j = 1; j < n; j++) {
+          const v = Math.max(vFwd[j - 1], 0.1);
+          const f = vehicleForces(vehicle, v);
+          const F_lat = vehicle.mass_kg * v * v * Math.abs(kappa[j - 1]);
+          const F_avail = Math.sqrt(Math.max(f.F_trac_max ** 2 - F_lat ** 2, 0));
+          const F_net = Math.max(Math.min(f.F_power, F_avail) - f.F_drag - f.F_roll, 0);
+          const a = F_net / vehicle.mass_kg;
+          vFwd[j] = Math.min(Math.sqrt(v * v + 2 * a * ds[j - 1]), vCorner[j]);
+        }
+
+        vBwd[n - 1] = vFwd[n - 1];
+        for (let j = n - 2; j >= 0; j--) {
+          const v = Math.max(vBwd[j + 1], 0.1);
+          const f = vehicleForces(vehicle, v);
+          const F_lat = vehicle.mass_kg * v * v * Math.abs(kappa[j]);
+          const F_bk = Math.sqrt(Math.max(f.F_brake_max ** 2 - F_lat ** 2, 0));
+          const a_brake = (F_bk + f.F_drag + f.F_roll) / vehicle.mass_kg;
+          vBwd[j] = Math.min(Math.sqrt(v * v + 2 * a_brake * ds[j]), vCorner[j]);
+        }
+
+        let maxDelta = 0;
+        for (let j = 0; j < n; j++) {
+          let s = Math.min(vCorner[j], Math.min(vFwd[j], vBwd[j]));
+          if (!(s >= 0) || Number.isNaN(s)) s = 0;
+          maxDelta = Math.max(maxDelta, Math.abs(s - speedPrev[j]));
+          speed[j] = s;
+        }
+        if (maxDelta < 0.01) break;
+      }
+      return speed;
+    }
+
+    // Port of calculateLapTime.m
+    function lapTimeFromSpeed(trk, speed) {
+      const n = trk.s.length, ds = trk.ds;
+      const dt = new Array(n - 1);
+      let lapTime = 0;
+      for (let j = 0; j < n - 1; j++) {
+        dt[j] = ds[j] / Math.max(speed[j], 1e-3);
+        lapTime += dt[j];
+      }
+      const cumTime = new Array(n);
+      cumTime[0] = 0;
+      for (let j = 1; j < n; j++) cumTime[j] = cumTime[j - 1] + dt[j - 1];
+      const lonG = new Array(n).fill(0);
+      for (let j = 0; j < n - 1; j++) lonG[j] = (speed[j + 1] - speed[j]) / dt[j] / WI_G;
+      return { lapTime, cumTime, lonG };
+    }
+
+    // Port of calculateSectorTimes.m
+    function sectorTimes(trk, speed, nSectors) {
+      const sTotal = trk.s[trk.s.length - 1];
+      const bounds = Array.from({ length: nSectors + 1 }, (_, k) => sTotal * k / nSectors);
+      const times = new Array(nSectors).fill(0);
+      for (let j = 0; j < trk.s.length - 1; j++) {
+        const sMid = (trk.s[j] + trk.s[j + 1]) / 2;
+        for (let k = 0; k < nSectors; k++) {
+          if (sMid >= bounds[k] && sMid < bounds[k + 1]) {
+            times[k] += trk.ds[j] / Math.max(speed[j], 1e-3);
+            break;
+          }
+        }
+      }
+      return times;
+    }
+
+    // Mirrors the gear/RPM heuristic in exportSimulationData.m
+    function gearAndRpm(vehicle, v) {
+      const r = vehicle.wheel_radius_m;
+      const wWheel = v / r;
+      let bestGear = 1, bestRpm = 4000;
+      for (let k = 0; k < vehicle.gear_ratios.length; k++) {
+        const testRpm = wWheel * vehicle.gear_ratios[k] * vehicle.final_drive * 60 / (2 * Math.PI);
+        if (testRpm <= 12500 && testRpm >= 3500) {
+          bestGear = k + 1;
+          bestRpm = testRpm;
+        } else if (testRpm < 3500 && k === 0) {
+          bestGear = 1;
+          bestRpm = Math.max(2500, testRpm);
+        }
+      }
+      return [bestGear, Math.round(Math.min(12500, Math.max(2500, bestRpm)))];
+    }
+
+    // Re-solves the lap for `vehicle` and rewrites the telemetry arrays that
+    // drive the 3D animation, HUD, and minimap -- the car actually drives
+    // differently, not just a number changing.
+    function applySolveToTelemetry(vehicle) {
+      const vCorner = corneringSpeed(vehicle, track.kappa);
+      const speed = speedProfile(track, vehicle, vCorner);
+      const { lapTime, cumTime, lonG } = lapTimeFromSpeed(track, speed);
+
+      totalLapTime = lapTime;
+      for (let j = 0; j < N; j++) {
+        tel.speed_mps[j] = speed[j];
+        tel.speed_kmh[j] = speed[j] * 3.6;
+        tel.time[j] = cumTime[j];
+        tel.lat_g[j] = (speed[j] * speed[j] * Math.abs(track.kappa[j])) / WI_G;
+        tel.lon_g[j] = lonG[j];
+        tel.throttle[j] = Math.max(0, Math.min(1, tel.lon_g[j] / 1.5));
+        tel.brake[j] = Math.max(0, Math.min(1, -tel.lon_g[j] / 2.0));
+        const [g, rpm] = gearAndRpm(vehicle, speed[j]);
+        tel.gear[j] = g;
+        tel.rpm[j] = rpm;
+      }
+
+      timeSlider.max = totalLapTime;
+      simTime = Math.min(simTime, totalLapTime);
+
+      document.getElementById('top-lap-time').textContent = formatLapTime(totalLapTime);
+      document.getElementById('top-max-speed').textContent = Math.max(...tel.speed_kmh).toFixed(1) + ' km/h';
+      document.getElementById('top-max-latg').textContent =
+        Math.max(...tel.lat_g.map(Math.abs)).toFixed(2) + ' g';
+
+      const sec = sectorTimes(track, speed, 3);
+      for (let k = 0; k < 3; k++) {
+        document.getElementById(`sec-val-${k + 1}`).textContent = sec[k].toFixed(2) + ' s';
+      }
+
+      document.getElementById('wi-current-time').textContent = formatLapTime(totalLapTime);
+      const delta = totalLapTime - jsBaselineLapTime;
+      const deltaEl = document.getElementById('wi-delta-time');
+      deltaEl.textContent = (delta >= 0 ? '+' : '') + delta.toFixed(2) + ' s';
+      deltaEl.classList.remove('faster', 'slower');
+      if (delta < -0.005) deltaEl.classList.add('faster');
+      else if (delta > 0.005) deltaEl.classList.add('slower');
+    }
+
+    // The MATLAB baseline (shown above) used the nonlinear Pacejka tire model;
+    // this JS solver only implements linear Coulomb friction (see note above).
+    // Compare deltas against a JS-solved baseline so the readout is 0.00s
+    // when the sliders sit at their defaults, not an artifact of that gap.
+    const jsBaselineLapTime = lapTimeFromSpeed(
+      track, speedProfile(track, baseVehicle, corneringSpeed(baseVehicle, track.kappa))
+    ).lapTime;
+
+    // What-If panel: show/hide
+    const wiToggle = document.getElementById('whatif-toggle');
+    const wiPanel = document.getElementById('whatif-panel');
+    wiToggle.addEventListener('click', () => {
+      wiPanel.classList.remove('hidden');
+      wiToggle.style.display = 'none';
+    });
+    document.getElementById('whatif-close').addEventListener('click', () => {
+      wiPanel.classList.add('hidden');
+      wiToggle.style.display = 'block';
+    });
+
+    // What-If panel: sliders -> re-solve
+    const wiMass = document.getElementById('wi-mass');
+    const wiAero = document.getElementById('wi-aero');
+    const wiMu = document.getElementById('wi-mu');
+    const wiPower = document.getElementById('wi-power');
+
+    function recomputeFromSliders() {
+      const massVal = parseFloat(wiMass.value);
+      const aeroVal = parseFloat(wiAero.value);
+      const muVal = parseFloat(wiMu.value);
+      const powerVal = parseFloat(wiPower.value) / 100;
+
+      document.getElementById('wi-mass-val').textContent = massVal.toFixed(0) + ' kg';
+      document.getElementById('wi-aero-val').textContent = aeroVal.toFixed(2) + '×';
+      document.getElementById('wi-mu-val').textContent = muVal.toFixed(2);
+      document.getElementById('wi-power-val').textContent = Math.round(powerVal * 100) + '%';
+
+      currentVehicle = Object.assign({}, baseVehicle, {
+        mass_kg: massVal,
+        tire_mu: muVal,
+        Cd: baseVehicle.Cd * aeroVal,
+        Cl: baseVehicle.Cl * aeroVal,
+        torque_Nm: baseVehicle.torque_Nm.map(t => t * powerVal),
+      });
+
+      applySolveToTelemetry(currentVehicle);
+    }
+
+    [wiMass, wiAero, wiMu, wiPower].forEach(el => el.addEventListener('input', recomputeFromSliders));
+
+    document.getElementById('wi-reset').addEventListener('click', () => {
+      wiMass.value = baseVehicle.mass_kg;
+      wiAero.value = 1.0;
+      wiMu.value = baseVehicle.tire_mu;
+      wiPower.value = 100;
+      recomputeFromSliders();
+    });
+
+    // Initialize slider positions + baseline readout from the exported data
+    wiMass.value = baseVehicle.mass_kg;
+    wiMu.value = baseVehicle.tire_mu;
+    document.getElementById('wi-mass-val').textContent = baseVehicle.mass_kg.toFixed(0) + ' kg';
+    document.getElementById('wi-mu-val').textContent = baseVehicle.tire_mu.toFixed(2);
+    document.getElementById('wi-baseline-time').textContent = formatLapTime(baselineLapTime);
+    document.getElementById('wi-current-time').textContent = formatLapTime(baselineLapTime);
 
     // TV Trackside Camera Positions along Spa
     const tvCameras = [
@@ -1145,17 +1611,19 @@
         ];
       }
 
-      // Draw circuit track outline
-      miniCtx.strokeStyle = 'rgba(255,255,255,0.25)';
-      miniCtx.lineWidth = 1.5;
-      miniCtx.beginPath();
+      // Draw circuit track outline, colored by speed (recolors live when the
+      // What-If sliders re-solve the speed profile -- see speedToColor()).
+      miniCtx.lineWidth = 2.5;
       for (let i = 0; i < N; i++) {
+        const j = (i + 1) % N;
         const [mx, my] = mapProj(tel.x[i], tel.y[i]);
-        if (i === 0) miniCtx.moveTo(mx, my);
-        else miniCtx.lineTo(mx, my);
+        const [nx, ny] = mapProj(tel.x[j], tel.y[j]);
+        miniCtx.strokeStyle = speedToColor(tel.speed_kmh[i]);
+        miniCtx.beginPath();
+        miniCtx.moveTo(mx, my);
+        miniCtx.lineTo(nx, ny);
+        miniCtx.stroke();
       }
-      miniCtx.closePath();
-      miniCtx.stroke();
 
       // Moving Car Blip
       const [carMx, carMy] = mapProj(curX, curY);

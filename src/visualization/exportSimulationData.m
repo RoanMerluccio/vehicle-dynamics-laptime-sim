@@ -114,6 +114,16 @@ if isfield(results, 'sectors')
     simData.sectors = results.sectors;
 end
 
+% Track curvature + segment lengths, needed by the browser-side physics
+% solver (web/spa_3d_simulation.html "What-If" sliders) to re-run the
+% cornering-speed / two-pass solve client-side without MATLAB.
+simData.track_kappa = round(track.kappa(:), 6);
+simData.track_ds    = round(track.ds(:), 4);
+
+% Baseline vehicle parameters, so the browser solver starts from the same
+% numbers MATLAB used (sliders then apply deltas on top of these).
+simData.vehicle_baseline = buildVehicleBaseline(vehicle);
+
 jsonData = jsonencode(simData);
 
 % Write to file if outputPath specified
@@ -122,12 +132,45 @@ if nargin >= 2 && ~isempty(outputPath)
     if ~isempty(outDir) && ~exist(outDir, 'dir')
         mkdir(outDir);
     end
+    [~, ~, ext] = fileparts(outputPath);
+    if strcmpi(ext, '.js')
+        % Browser <script src="...js"> needs an assignment, not bare JSON.
+        fileContent = ['window.SPA_SIM_DATA = ' jsonData ';'];
+    else
+        fileContent = jsonData;
+    end
     fid = fopen(outputPath, 'w');
     if fid == -1
         error('Failed to open file for writing: %s', outputPath);
     end
-    fwrite(fid, jsonData, 'char');
+    fwrite(fid, fileContent, 'char');
     fclose(fid);
-    fprintf('Telemetry exported to %s (%.1f KB)\n', outputPath, numel(jsonData)/1024);
+    fprintf('Telemetry exported to %s (%.1f KB)\n', outputPath, numel(fileContent)/1024);
+end
+end
+
+function vb = buildVehicleBaseline(vehicle)
+%BUILDVEHICLEBASELINE Defensively pull the fields the web solver needs,
+%   falling back to the RUN_SPA.m defaults for any that are missing.
+vb.mass_kg          = getf(vehicle, 'mass_kg', 1200);
+vb.tire_mu          = getf(vehicle, 'tire_mu', 1.6);
+vb.Cd               = getf(vehicle, 'Cd', 0.8);
+vb.Cl               = getf(vehicle, 'Cl', 1.5);
+vb.frontal_area_m2  = getf(vehicle, 'frontal_area_m2', 0.5);
+vb.air_density_kgm3 = getf(vehicle, 'air_density_kgm3', 1.225);
+vb.wheel_radius_m   = getf(vehicle, 'wheel_radius_m', 0.230);
+vb.brake_max_N      = getf(vehicle, 'brake_max_N', 10000);
+vb.torque_rpm       = getf(vehicle, 'torque_rpm', [3000 4000 5000 6000 7000 8000 9000 10000 11000 12000]);
+vb.torque_Nm        = getf(vehicle, 'torque_Nm', [38 52 62 68 70 69 65 58 47 32]);
+vb.gear_ratios      = getf(vehicle, 'gear_ratios', [3.6 2.4 1.8 1.4 1.1]);
+vb.final_drive      = getf(vehicle, 'final_drive', 3.8);
+vb.transmission_eff = getf(vehicle, 'transmission_eff', 0.92);
+end
+
+function v = getf(s, f, d)
+if isfield(s, f) && ~isempty(s.(f))
+    v = s.(f);
+else
+    v = d;
 end
 end

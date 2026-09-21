@@ -1,5 +1,10 @@
 function forces = calculateVehicleForces(vehicle, v)
 %CALCULATEVEHICLEFORCES Compute drag, downforce, traction limits, and drive forces at speed v.
+%
+%   Supports two tire friction models (set vehicle.tire_model):
+%     'linear'   - Coulomb friction: F = mu * Fn  (default, backward compatible)
+%     'pacejka'  - Pacejka Magic Formula 94: nonlinear, load-sensitive
+%                  Uses calculatePacejkaTire() with optional vehicle.pacejka_coeffs
 
 g    = 9.81;
 C_rr = 0.015;
@@ -13,8 +18,32 @@ F_down = vehicle.Cl .* qA;                           % Downforce pushes car into
 
 % Normal force includes vehicle weight + aero downforce
 F_normal   = vehicle.mass_kg * g + F_down;
-F_trac_max = vehicle.tire_mu .* F_normal;            % Maximum tire grip limit (F = mu * N)
-F_roll     = C_rr * vehicle.mass_kg * g * ones(N,1); % Rolling resistance
+
+% Tire friction model selection
+tire_model = 'linear';
+if isfield(vehicle, 'tire_model')
+    tire_model = vehicle.tire_model;
+end
+
+switch lower(tire_model)
+    case 'pacejka'
+        % Pacejka Magic Formula 94: peak mu varies with normal load
+        % This captures load-sensitivity (degressive behaviour at high Fz).
+        pcoeffs = [];
+        if isfield(vehicle, 'pacejka_coeffs'); pcoeffs = vehicle.pacejka_coeffs; end
+        % calculatePacejkaTire's load-sensitivity curve (Fz_ref = 1500 N) is
+        % calibrated per tire; F_normal here is the whole car, so divide by
+        % 4 corners before evaluating it.
+        mu_eff = zeros(N,1);
+        for ki = 1:N
+            [~, mu_eff(ki)] = calculatePacejkaTire(F_normal(ki) / 4, [], pcoeffs);
+        end
+        F_trac_max = mu_eff .* F_normal;
+    otherwise % 'linear' (Coulomb)
+        F_trac_max = vehicle.tire_mu .* F_normal;    % F = mu * N
+end
+
+F_roll = C_rr * vehicle.mass_kg * g * ones(N,1); % Rolling resistance
 
 % Available engine drive force
 if isfield(vehicle,'torque_rpm') && isfield(vehicle,'torque_Nm') ...
@@ -31,7 +60,10 @@ if isfield(vehicle,'torque_rpm') && isfield(vehicle,'torque_Nm') ...
         for k = 1:numel(gears)
             ratio = gears(k) * fd;
             rpm   = omega_w * ratio * 60 / (2*pi);
-            rpm   = max(min(rpm, max(vehicle.torque_rpm)), min(vehicle.torque_rpm));
+            if rpm > max(vehicle.torque_rpm)
+                continue; % over-revved in this gear; the car would have shifted up already
+            end
+            rpm   = max(rpm, min(vehicle.torque_rpm)); % idle/lugging floor
             T     = interp1(vehicle.torque_rpm, vehicle.torque_Nm, rpm, 'linear');
             F_w   = T * ratio * eta / r;
             if F_w > best_F; best_F = F_w; end

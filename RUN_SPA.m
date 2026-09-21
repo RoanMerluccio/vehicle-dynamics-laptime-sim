@@ -39,6 +39,12 @@ vehicle.brake_max_N      = 10000;
 vehicle.cg_height_m      = 0.30;
 vehicle.wheelbase_m      = 1.55;
 
+% Tire model: 'pacejka' uses Magic Formula 94 (industry-standard nonlinear model)
+%             'linear'  uses Coulomb friction (classic F = mu*N, backward compatible)
+vehicle.tire_model       = 'pacejka';   % <-- upgrade from linear
+% Pacejka coeffs (FSAE dry-slick defaults; override with real TTC data if available):
+% vehicle.pacejka_coeffs = struct('B', 10.0, 'C', 1.9, 'D', 1.6, 'E', 0.97);
+
 % Powertrain: torque curve from a typical 600cc inline-4 (FSAE)
 vehicle.torque_rpm  = [3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000];
 vehicle.torque_Nm   = [38,   52,   62,   68,   70,   69,   65,   58,    47,    32  ];
@@ -85,8 +91,29 @@ visualizeResults(results);
 
 %% 7. Interactive 3D Simulation
 %  Export telemetry for WebGL browser viewer
-exportSimulationData(results, fullfile(projectRoot, 'web', 'spa_sim_data.json'));
+exportSimulationData(results, fullfile(projectRoot, 'web', 'spa_sim_data.js'));
 
 %  Launch native MATLAB 3D simulation with live HUD and camera controls:
 fprintf('Launching 3D Car Simulation...\n');
 simulateCar3D(results);
+
+%% 8. Bonus: Tire model comparison (linear Coulomb vs. Pacejka Magic Formula)
+%    Quantifies the improvement from upgrading to the industry-standard nonlinear model.
+fprintf('\n--- Tire Model Comparison ---\n');
+vehicle_linear            = vehicle;
+vehicle_linear.tire_model = 'linear';
+track2    = calculateTrackGeometry(x, y);
+vc_lin    = calculateCorneringSpeed(vehicle_linear, track2.kappa);
+spd_lin   = calculateSpeedProfile(track2, vehicle_linear, vc_lin);
+res_lin   = calculateLapTime(track2, spd_lin);
+fprintf('  Linear (Coulomb) tire:   %6.2f s  (%.2f min)\n', ...
+    res_lin.lap_time_s, res_lin.lap_time_s/60);
+fprintf('  Pacejka Magic Formula:   %6.2f s  (%.2f min)\n', ...
+    results.lap_time_s, results.lap_time_s/60);
+dt_compare = res_lin.lap_time_s - results.lap_time_s;
+if dt_compare >= 0
+    fprintf('  Delta: Pacejka is %.2f s faster (nonlinear load-sensitivity effect)\n', dt_compare);
+else
+    fprintf('  Delta: Pacejka predicts %.2f s longer lap\n', abs(dt_compare));
+end
+fprintf('----------------------------\n\n');
